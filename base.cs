@@ -1,14 +1,21 @@
-﻿namespace p64vm2
+﻿using System.Collections;
+
+namespace p64vm2
 {
     class PvmErr
     {
 #pragma warning disable CA1822 // Mark members as static
         public void NullPtr()
-#pragma warning restore CA1822 // Mark members as static
         {
             Console.WriteLine("Pointer is null.");
             Environment.Exit(1);
         }
+        public void EmptyStack()
+        {
+            Console.WriteLine("Pointer stack is empty.");
+            Environment.Exit(1);
+        }
+#pragma warning restore CA1822 // Mark members as static
     }
     class AllocationObject
     {
@@ -22,12 +29,12 @@
     }
     class RAM
     {
-        public static int ramsize = 0xFFFFF;
+        public static int ramsize = 0xFFFF;
         private readonly int[] _bus = new int[ramsize];
         private readonly bool[] _allocated = new bool[ramsize];
         public AllocationObject? Allocate(int ptr, int value)
         {
-            _bus[ptr] = value;
+            _bus[ptr] = value;         
             _allocated[ptr] = true;
             return new AllocationObject(ptr);
         }
@@ -54,21 +61,45 @@
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
         }
     }
+    class PSM
+    {
+        public static int bits = 1024;
+        public string humankey = "";
+        private readonly bool[] x = new bool[bits];
+        public PSM()
+        {
+            for (int i = 0; i < bits; i++)
+            {
+                var t = new Random().Next(2) == 1;
+                if (t == false) { humankey += "0"; }
+                else if (t == true) { humankey += "1"; }
+                x[i] = t;
+            }
+        }
+    }
     class CPU
     {
         private readonly RAM ram = new();
+        public readonly PSM psm = new();
         private readonly Dictionary<string, AllocationObject?> vars = new();
         private readonly Stack<int> pointers = new();
         public CPU(){
-            int i = 0;
-            for (; i < RAM.ramsize; i++)
+            for (int i = 0; i < RAM.ramsize; i++)
             {
                 pointers.Push(i);
             }
-            Console.WriteLine("Allocated: 33,554,400 Bits");
+            Console.WriteLine("Allocated: " + RAM.ramsize*32 + " bits.");
         }
         public void NewVar(string name, int value)
         {
+            if (vars.ContainsKey(name))
+            {
+                DeleteVar(name);
+            }
+            if (pointers.Count == 0)
+            {
+                new PvmErr().EmptyStack();
+            }
             AllocationObject? allocationObject = ram.Allocate(pointers.Pop(), value);
             vars.Add(name, allocationObject);
         }
@@ -85,17 +116,6 @@
         {
             vars.TryGetValue(name, out var allocationObject);
             return ram.Get(allocationObject);
-        }
-    }
-    class VM
-    {
-        static void Main()
-        {
-            Console.WriteLine(String.Concat(Enumerable.Repeat(" ", Console.WindowWidth/2))+"pogvm");
-            CPU cpu = new();
-            cpu.NewVar("test", 69);
-            Console.WriteLine(cpu.GetVar("test"));
-            cpu.DeleteVar("test");
         }
     }
 }
